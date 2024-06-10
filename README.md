@@ -1,5 +1,4 @@
-Task 2:
-Title: Voice-to-Text System Development
+Task 2: Title: Voice-to-Text System Development
 Objective:
 The primary objective of this project is to design and implement a robust voice-to-text (speech recognition)
 system capable of accurately transcribing spoken language into textual form. The system should be able
@@ -20,5 +19,7 @@ Deliverable:
 1. Functional speech recognition system capable of converting audio input into text with specified
 accuracy and performance metrics.
 2. Deploy the model on Git
-3. Integration with audio input sources and interfaces for real-time transcription. 4. Documentation summarizing system architecture, algorithms, implementation details, . 5. Evaluation results demonstrating the performance of the speech recognition system across
+3. Integration with audio input sources and interfaces for real-time transcription.
+4. Documentation summarizing system architecture, algorithms, implementation details, .
+5. Evaluation results demonstrating the performance of the speech recognition system across
 different test scenarios and data sets.
