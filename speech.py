@@ -1,63 +1,69 @@
-import speech_recognition as sr
-import librosa
+import whisper
+import pyaudio
 import numpy as np
-import queue
-import sounddevice as sd
-import torch
-import torchaudio
+import wave
 
 
-def preprocess_audio(audio_file):
-    y, sr = librosa.load(audio_file, sr=16000) 
-    y = librosa.effects.preemphasis(y)
-    y = librosa.effects.trim(y)[0]  
-    y = librosa.util.normalize(y) 
-    return y, sr
+model = whisper.load_model("base")
 
 
-def callback(indata, frames, time, status):
-    if status:
-        print(status)
-    q.put(indata.copy())
+FORMAT = pyaudio.paInt16  
+CHANNELS = 1              
+RATE = 16000              
+CHUNK = 1024              
+RECORD_SECONDS = 10        
 
 
-recognizer = sr.Recognizer()
+audio = pyaudio.PyAudio()
 
 
-def voice_to_text():
-    q = queue.Queue()
-    with sd.InputStream(callback=callback):
-        print("Listening...")
-        while True:
-            audio_data = q.get()
-           
-            audio_tensor = torch.from_numpy(audio_data.T).float()
-            text = model.transcribe(audio_tensor, 16000)
-            print(f"Transcription: {text}")
+stream = audio.open(format=FORMAT, channels=CHANNELS,
+                    rate=RATE, input=True,
+                    frames_per_buffer=CHUNK)
 
-if __name__ == "__main__":
- 
-    model = torch.hub.load('snakers4/silero-models', 'silero_stt', language='en')
+print("Listening...")
 
-    with sr.Microphone() as source:
-        print("Speek something")
-        audio = recognizer.listen(source)
 
-        try:
-            text = recognizer.recognize_google(audio)
-            print(f"Google speech recognition: {text}")
-        except sr.UnknownValueError:
-            print("Google Speech Recognition could not found")
-        except sr.RequestError as e:
-            print(f"Could not found request results; {e}")
+def transcribe_audio(audio_data):
+    audio_array = np.frombuffer(audio_data, np.int16).astype(np.float32) / 32768.0
+    audio_segment = whisper.pad_or_trim(audio_array)
+    mel = whisper.log_mel_spectrogram(audio_segment).to(model.device)
+    options = whisper.DecodingOptions(language="en", fp16=False)
+    result = whisper.decode(model, mel, options)
+    return result.text
 
-    #sample audio file
-    audio_file = 'audio_file.wav'
-    processed_audio, sample_rate = preprocess_audio(audio_file)
-    audio_tensor = torch.from_numpy(np.expand_dims(processed_audio, axis=0)).float()
 
-    text = model.transcribe(audio_tensor, sample_rate)
-    print(f"Transcription: {text}")
+def save_audio_to_file(audio_data, filename="debug_audio.wav"):
+    wf = wave.open(filename, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(audio.get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(audio_data)
+    wf.close()
 
-   
-    voice_to_text()
+try:
+    while True:
+        print("Recording for {} seconds...".format(RECORD_SECONDS))
+        frames = []
+        
+        for _ in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+            data = stream.read(CHUNK, exception_on_overflow=False)
+            frames.append(data)
+        
+        
+        audio_data = b''.join(frames)
+        
+       
+        save_audio_to_file(audio_data, "debug_audio.wav")
+        
+        
+        text = transcribe_audio(audio_data)
+        print(f"Transcribed Text: {text}")
+
+except KeyboardInterrupt:
+    print("Stopping...")
+
+finally:
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
